@@ -48,6 +48,24 @@ def write_zip_file(path, data, old_size):
 
 
 
+
+
+##
+#   write_unzip_file(): Write the uncompressed version of the lzw file:
+##
+
+def write_unzip_file(path, data):
+
+    output_name = path.split(".")[0]
+    output_name = output_name.split("/")[-1]
+
+    with open(output_name + "2" + ".txt", "w") as file_out:
+
+        file_out.write(data)
+
+
+
+
 ##
 #   write_dico_file(): Write the dictionnary of character in a csv file:
 ##
@@ -62,6 +80,22 @@ def write_dico_file(path, dico):
         for i in range(len(dico) - 1):
             file_out.write(dico[i] + ",")
         file_out.write(dico[-1] + "\r\n")
+
+
+
+
+##
+#   read_dico_file(): Read the dictionnary of character from a csv file:
+##
+
+def read_dico_file(path):
+
+    input_name = path.split(".")[0]
+    input_name = input_name.split("/")[-1]
+
+    dico = pd.read_csv(input_name + "_dico" + ".csv")
+    dico = list((dico.to_dict()).keys())
+    return len(dico), dico
 
 
 
@@ -127,6 +161,7 @@ def dico_constructor(data):
 ##
 
 def to_bitwise(nb, nb_bits):
+
     bitwise = ""
 
     while (nb_bits > 0):
@@ -138,6 +173,26 @@ def to_bitwise(nb, nb_bits):
         nb_bits -= 1
 
     return bitwise
+
+
+
+
+##
+#   to_char(): Translate a bitwise string into his character in dictionnary:
+##
+
+def to_char(dico, bitwise):
+
+    value = 0
+
+    for i in range(len(bitwise)):
+        if (bitwise[i] == "1"):
+            value += pow (2, len(bitwise) - i - 1)
+
+
+    return dico[value]
+
+
 
 
 
@@ -225,8 +280,54 @@ def lzw_unzip(path):
     if (len(path) < 4 or path[-4:] != ".lzw"):
         error_format();
         return None
-    else:
-        print("Not implemented yet")
+
+
+    with open(path, "r") as file_in:
+
+
+        data = file_in.read()
+        dico_size, dico = read_dico_file(path)
+        buf = ""
+        cur_bitwise = ""
+        output = ""
+        nb_bit = ceil(log2(dico_size))
+
+        for bit in data:
+
+            if bit == '\n':
+                continue
+
+            if len(cur_bitwise + bit) <= nb_bit:
+                cur_bitwise += bit
+
+            else:
+                char = to_char(dico, cur_bitwise)
+                cur_bitwise = bit
+
+                if char == "%":
+                    nb_bit += 1
+
+                elif (buf + char) in dico:
+                    buf += char
+
+
+                elif buf != "":
+
+                    output += buf
+                    dico += [buf + char]
+                    dico_size += 1
+
+                    buf = char
+
+        if buf in dico:
+            output += buf
+        buf = to_char(dico, cur_bitwise)
+        output += buf + '\n'
+
+    write_unzip_file(path, output)
+
+
+
 
 
 
@@ -247,7 +348,7 @@ def parse_argument():
     #Add all of the possible arguments:
     parser.add_argument("-c", "--compress", help="Compress the file given after the '-p' option using the lossless LZW compression algorithm.",
                         action="store_true")
-    parser.add_argument("-u", "--unzip", help="Decompress the file given after the '-p' option using the lossless LZW decompression algorithm.",
+    parser.add_argument("-u", "--uncompress", help="Decompress the file given after the '-p' option using the lossless LZW decompression algorithm.",
                         action="store_true")
     parser.add_argument("-p", "--path", help="Specify the file to Compress/Decompress.")
 
@@ -255,7 +356,7 @@ def parse_argument():
     args = parser.parse_args()
 
     #Check if bad use of arguments:
-    if (args.path == None or (args.compress == args.unzip)):
+    if (args.path == None or (args.compress == args.uncompress)):
         print("\nerror: You must use these commands to proceed:\n",
                 "\tpython3 kevin.guillet_LZW.py -c -p path/to/the/file.txt",
                 "\tor",
